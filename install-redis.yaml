@@ -1,0 +1,10 @@
+# https://www.toptechskills.com/ansible-tutorials-courses/ansible-apt-module-tutorial-examples/
+- hosts: homeserver
+  tasks:
+    - name: install redis on Debian based distros 
+      apt:
+        name: redis-server
+        state: present
+        update_cache: true
+      become: true
+      when: ansible_os_family == 'Debian'

@@ -1,0 +1,56 @@
+# run this playbook on the following machine
+- hosts: homeserver
+  become: true
+  # list of tasks this playbook will perform
+  tasks:
+
+  # ======================
+  # SAMBA
+  # ======================
+    - name: Install latest Samba version
+      apt:
+        name: ["samba", "samba-common"]
+        state: latest
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+
+    - name: Check if original config was backed up
+      stat:
+        path: /etc/samba/smb.org
+      register: f
+
+    - name: Backup the original configuration file
+      shell:
+        cmd: mv /etc/samba/smb.conf /etc/samba/smb.org
+      when: f.stat.exists == False
+    
+    - name: Copy configuration file to remote host
+      copy:
+        src: ./configs/samba/smb.conf
+        dest: /etc/samba/smb.conf
+        owner: root
+        group: root
+        mode: '0644'
+    
+
+    - name: Configure Samba users.
+      shell: >
+        (pdbedit --user={{ item.username }} 2>&1 > /dev/null)
+        || (echo '{{ item.password }}'; echo '{{ item.password }}')
+        | smbpasswd -s -a {{ item.username }}
+      register: smbpasswd
+      changed_when: "'Added user' in smbpasswd.stdout"
+      with_items: "{{ samba_users }}"
+      loop_control:
+        label: "{{ item.username }}"
+
+
+    - name: Reload Samba service
+      service:
+        name: smbd
+        state: restarted
+
+    - name: Reload NetBios service
+      service:
+        name: nmbd
+        state: restarted
